@@ -8,6 +8,7 @@ import respectRoute from './routes/respect.js';
 import empireRoute from './routes/empire.js';
 import wavewarzRoute from './routes/wavewarz.js';
 import easRoute from './routes/eas.js';
+import identityRoute from './routes/identity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,6 +21,7 @@ app.use('/api/respect', respectRoute);
 app.use('/api/empire', empireRoute);
 app.use('/api/wavewarz', wavewarzRoute);
 app.use('/api/eas', easRoute);
+app.use('/api/identity', identityRoute);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

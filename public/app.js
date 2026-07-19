@@ -52,11 +52,21 @@ async function connectAndLoad() {
 }
 
 async function loadStats(address) {
-  const [respect, empire, wavewarz] = await Promise.all([
+  const [respect, empire, identity] = await Promise.all([
     fetchJSON(`/api/respect/${address}`),
     fetchJSON(`/api/empire/${address}`),
-    fetchJSON(`/api/wavewarz/${address}`),
+    fetchJSON(`/api/identity/${address}`),
   ]);
+
+  // Check every verified Solana address against WaveWarZ, not just the first -
+  // an artist's WaveWarZ wallet may not be their primary verified address.
+  let wavewarz = { found: false, note: 'no verified Solana address on this Farcaster account' };
+  if (identity.solAddresses?.length) {
+    const results = await Promise.all(
+      identity.solAddresses.map((solAddr) => fetchJSON(`/api/wavewarz/${solAddr}`).catch(() => ({ found: false })))
+    );
+    wavewarz = results.find((r) => r.found) || { found: false, note: 'no WaveWarZ match across verified Solana addresses' };
+  }
 
   currentStats = { respect, empire, wavewarz };
 
@@ -72,10 +82,10 @@ async function loadStats(address) {
 
   document.getElementById('stat-wavewarz').textContent = wavewarz.found
     ? `${wavewarz.wins} wins`
-    : 'no wallet match';
+    : 'no match';
   document.getElementById('stat-wavewarz-detail').textContent = wavewarz.found
     ? `${wavewarz.volumeSol} SOL volume`
-    : 'check WaveWarZ wallet linkage';
+    : (wavewarz.note || 'check WaveWarZ wallet linkage');
 
   els.statsGrid.hidden = false;
   els.attestSection.hidden = false;
