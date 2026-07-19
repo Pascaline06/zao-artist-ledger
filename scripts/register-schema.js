@@ -1,17 +1,14 @@
 // Run once: node scripts/register-schema.js
-// Registers SCHEMA_STRING (server/lib/easSchema.js) on Base's SchemaRegistry
-// and prints the schemaUID. Paste that into .env as EAS_SCHEMA_UID - every
-// attestation this app writes afterward references that one schema.
-//
-// Needs EAS_SIGNER_PRIVATE_KEY set to a funded Base wallet (gas only, a few cents).
-// This is the ONE step that needs a private key in this repo - registering the
-// schema is a one-time admin action, separate from artists signing their own
-// attestations later (see server/routes/eas.js).
-
-import { EAS, SchemaRegistry } from '@ethereum-attestation-service/eas-sdk';
 import { ethers } from 'ethers';
+import { createRequire } from 'module';
 import 'dotenv/config';
 import { SCHEMA_STRING } from '../server/lib/easSchema.js';
+
+// Loading via createRequire (CommonJS) rather than ESM import - the EAS
+// SDK's ESM build has a broken named-import from lodash in this environment.
+// Its CommonJS build doesn't have this problem.
+const require = createRequire(import.meta.url);
+const { SchemaRegistry } = require('@ethereum-attestation-service/eas-sdk');
 
 const SCHEMA_REGISTRY_BASE = '0x4200000000000000000000000000000000000020';
 
@@ -30,7 +27,7 @@ async function main() {
 
   const tx = await registry.register({
     schema: SCHEMA_STRING,
-    resolverAddress: ethers.ZeroAddress, // no resolver contract - keep it simple for v1
+    resolverAddress: ethers.ZeroAddress,
     revocable: true,
   });
 

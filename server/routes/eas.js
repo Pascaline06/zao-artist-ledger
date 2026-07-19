@@ -17,7 +17,7 @@ router.post('/prepare', async (req, res) => {
   try {
     const snapshotTimestamp = Math.floor(Date.now() / 1000);
 
-    const encodedData = await encodeAttestationData({
+    const encodedData = encodeAttestationData({
       artist,
       ogRespect,
       zorRespect,

@@ -1,10 +1,12 @@
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { SchemaEncoder } = require('@ethereum-attestation-service/eas-sdk');
+
 export const SCHEMA_STRING =
   'string artist,uint256 ogRespect,uint256 zorRespect,uint256 empireRank,uint256 wavewarzWins,uint256 wavewarzVolumeSol,uint256 snapshotTimestamp';
 
-// Lazy-loaded: the EAS SDK's lodash import doesn't resolve cleanly under plain
-// Node ESM here, so we only pull it in when this function actually runs,
-// not at server startup.
-export async function encodeAttestationData({
+export function encodeAttestationData({
   artist,
   ogRespect,
   zorRespect,
@@ -13,7 +15,6 @@ export async function encodeAttestationData({
   wavewarzVolumeSol,
   snapshotTimestamp,
 }) {
-  const { SchemaEncoder } = await import('@ethereum-attestation-service/eas-sdk');
   const encoder = new SchemaEncoder(SCHEMA_STRING);
   return encoder.encodeData([
     { name: 'artist', value: artist, type: 'string' },
