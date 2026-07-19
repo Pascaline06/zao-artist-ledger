@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZAO Artist Value Ledger</title>
+
+<meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://your-deployed-url.vercel.app/assets/embed-card.png","button":{"title":"Open your ledger","action":{"type":"launch_miniapp","name":"ZAO Artist Value Ledger","url":"https://your-deployed-url.vercel.app","splashImageUrl":"https://your-deployed-url.vercel.app/assets/logo.png","splashBackgroundColor":"#070709"}}}' />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<main class="page">
+
+  <header class="header">
+    <span class="eyebrow">The ZAO</span>
+    <h1>Artist Value Ledger</h1>
+    <p class="sub">What The ZAO has generated for you, in one place - and a portable proof you can take anywhere.</p>
+  </header>
+
+  <section class="identity-card" id="identity-card">
+    <p class="identity-prompt">Connect your Farcaster wallet to load your standing.</p>
+    <button id="connect-btn" class="btn-primary">Connect wallet</button>
+    <p class="identity-address" id="identity-address" hidden></p>
+  </section>
+
+  <section class="stats-grid" id="stats-grid" hidden>
+    <div class="stat-card">
+      <span class="stat-label">Respect</span>
+      <span class="stat-value" id="stat-respect">-</span>
+      <span class="stat-detail" id="stat-respect-detail">OG + ZOR combined</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Empire Builder rank</span>
+      <span class="stat-value" id="stat-empire">-</span>
+      <span class="stat-detail" id="stat-empire-detail">ZABAL Empire</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">WaveWarZ</span>
+      <span class="stat-value" id="stat-wavewarz">-</span>
+      <span class="stat-detail" id="stat-wavewarz-detail">wins - SOL volume</span>
+    </div>
+  </section>
+
+  <section class="attest-section" id="attest-section" hidden>
+    <h2>Mint your proof</h2>
+    <p>This writes a signed, permanent attestation of the snapshot above to Base via EAS. It's yours to show anyone - a festival, a sponsor, a label - without needing them to trust a screenshot.</p>
+    <button id="mint-btn" class="btn-primary">Mint proof of value</button>
+    <p class="mint-status" id="mint-status"></p>
+  </section>
+
+</main>
+
+<script type="module" src="https://esm.sh/@farcaster/miniapp-sdk"></script>
+<script type="module" src="https://esm.sh/viem@2"></script>
+<script type="module" src="https://esm.sh/@ethereum-attestation-service/eas-sdk@2"></script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

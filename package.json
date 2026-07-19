@@ -1,0 +1,25 @@
+{
+  "name": "zao-artist-value-ledger",
+  "version": "0.1.0",
+  "description": "Reads an artist's Respect, Empire Builder, and WaveWarZ standing and lets them mint a portable EAS attestation of it on Base. Built for ZABAL Gamez Season 1.",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "@ethereum-attestation-service/eas-sdk": "^2.7.0",
+    "@neynar/nodejs-sdk": "^2.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "express": "^4.21.1",
+    "node-cron": "^3.0.3",
+    "viem": "^2.21.44"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
