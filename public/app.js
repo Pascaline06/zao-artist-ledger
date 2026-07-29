@@ -51,7 +51,7 @@ let currentStats = null;
 let currentDisplayName = null;
 let siwfPollTimer = null;
 let siwfTimeoutTimer = null;
-let wcProvider = null; // cached WalletConnect provider, once created
+let wcProvider = null;
 
 els.siwfBtn.addEventListener('click', signInWithFarcaster);
 els.connectBtn.addEventListener('click', connectWalletDirectly);
@@ -200,17 +200,34 @@ async function loadStats(address, knownSolAddresses) {
   document.getElementById('attest-section').hidden = false;
 }
 
-// Returns an EIP-1193 provider to sign with: the injected wallet if one
-// exists (MetaMask etc.), otherwise lazily brings up WalletConnect's QR /
-// deep-link flow so ANY browser can still sign a transaction.
+// Tries three signing options in order:
+// 1. The Farcaster Mini App's own wallet - only present when this page is
+//    actually LAUNCHED as a Mini App inside Warpcast/Base App (not just
+//    opened as a regular link, even inside their browser).
+// 2. An injected wallet (MetaMask etc.) - when opened inside a wallet app's
+//    own browser.
+// 3. WalletConnect - any other plain browser, no extension needed.
 async function getSigningProvider() {
+  try {
+    const hasHost = await Promise.race([
+      sdk.actions.ready().then(() => true),
+      new Promise((resolve) => setTimeout(() => resolve(false), 1200)),
+    ]);
+    if (hasHost && sdk.wallet?.ethProvider) {
+      els.mintStatus.textContent = 'Using your Farcaster wallet...';
+      return sdk.wallet.ethProvider;
+    }
+  } catch (err) {
+    console.error('Farcaster wallet not available, trying next option', err);
+  }
+
   if (window.ethereum) return window.ethereum;
 
   if (!wcProvider) {
     els.mintStatus.textContent = 'Loading wallet connector...';
     const { walletConnectProjectId } = await fetchJSON('/api/config');
     if (!walletConnectProjectId) {
-      throw new Error('No wallet extension found, and WalletConnect is not configured.');
+      throw new Error('No wallet found, and WalletConnect is not configured.');
     }
 
     const { EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2');
