@@ -2,68 +2,177 @@ import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 import { createWalletClient, custom } from 'https://esm.sh/viem@2';
 import { base } from 'https://esm.sh/viem@2/chains';
 
+const EAS_ABI = [
+  {
+    name: 'attest',
+    type: 'function',
+    stateMutability: 'payable',
+    inputs: [{
+      name: 'request', type: 'tuple',
+      components: [
+        { name: 'schema', type: 'bytes32' },
+        { name: 'data', type: 'tuple', components: [
+          { name: 'recipient', type: 'address' },
+          { name: 'expirationTime', type: 'uint64' },
+          { name: 'revocable', type: 'bool' },
+          { name: 'refUID', type: 'bytes32' },
+          { name: 'data', type: 'bytes' },
+          { name: 'value', type: 'uint256' },
+        ]},
+      ],
+    }],
+    outputs: [{ name: '', type: 'bytes32' }],
+  },
+];
+
 const els = {
+  siwfBtn: document.getElementById('siwf-btn'),
+  siwfStatus: document.getElementById('siwf-status'),
+  siwfFallbackLink: document.getElementById('siwf-fallback-link'),
   connectBtn: document.getElementById('connect-btn'),
-  identityCard: document.getElementById('identity-card'),
+  connectDivider: document.querySelector('.connect-divider'),
   identityPrompt: document.querySelector('.identity-prompt'),
   identityAddress: document.getElementById('identity-address'),
-  statsGrid: document.getElementById('stats-grid'),
-  attestSection: document.getElementById('attest-section'),
   mintBtn: document.getElementById('mint-btn'),
   mintStatus: document.getElementById('mint-status'),
+  proofCard: document.getElementById('proof-card'),
+  proofArtist: document.getElementById('proof-artist'),
+  proofRespect: document.getElementById('proof-respect'),
+  proofEmpire: document.getElementById('proof-empire'),
+  proofWavewarz: document.getElementById('proof-wavewarz'),
+  proofDate: document.getElementById('proof-date'),
+  proofLink: document.getElementById('proof-link'),
+  proofUrlFallback: document.getElementById('proof-url-fallback'),
+  shareBtn: document.getElementById('share-btn'),
 };
 
 let currentAddress = null;
 let currentStats = null;
+let currentDisplayName = null;
+let siwfPollTimer = null;
+let siwfTimeoutTimer = null;
+let wcProvider = null; // cached WalletConnect provider, once created
 
-els.connectBtn.addEventListener('click', connectAndLoad);
+els.siwfBtn.addEventListener('click', signInWithFarcaster);
+els.connectBtn.addEventListener('click', connectWalletDirectly);
 els.mintBtn.addEventListener('click', mintAttestation);
+els.shareBtn.addEventListener('click', shareProof);
 
-async function connectAndLoad() {
+function clearSiwfTimers() {
+  if (siwfPollTimer) clearInterval(siwfPollTimer);
+  if (siwfTimeoutTimer) clearTimeout(siwfTimeoutTimer);
+  siwfPollTimer = null;
+  siwfTimeoutTimer = null;
+}
+
+async function signInWithFarcaster() {
+  els.siwfBtn.disabled = true;
+  els.siwfBtn.textContent = 'Waiting for approval...';
+  els.siwfStatus.hidden = false;
+  els.siwfStatus.textContent = 'Opening Farcaster...';
+
+  try {
+    const { channelToken, url } = await fetchJSON('/api/siwf/create-channel', { method: 'POST' });
+
+    els.siwfFallbackLink.href = url;
+    els.siwfFallbackLink.hidden = false;
+    window.open(url, '_blank');
+
+    clearSiwfTimers();
+
+    siwfPollTimer = setInterval(async () => {
+      try {
+        const status = await fetchJSON(`/api/siwf/status/${channelToken}`);
+        if (status.state === 'completed') {
+          clearSiwfTimers();
+          els.siwfStatus.textContent = 'Loading your standing...';
+          await handleSiwfSuccess(status);
+        }
+      } catch (err) {
+        console.error('poll error', err);
+      }
+    }, 2000);
+
+    siwfTimeoutTimer = setTimeout(() => {
+      clearSiwfTimers();
+      els.siwfStatus.textContent = 'Sign-in expired - tap to try again.';
+      els.siwfBtn.disabled = false;
+      els.siwfBtn.textContent = 'Sign in with Farcaster';
+    }, 3 * 60 * 1000);
+  } catch (err) {
+    console.error(err);
+    els.siwfStatus.textContent = `Could not start sign-in: ${err.message}`;
+    els.siwfBtn.disabled = false;
+    els.siwfBtn.textContent = 'Sign in with Farcaster';
+  }
+}
+
+async function handleSiwfSuccess(status) {
+  const ethAddresses = status.verifications.filter((v) => /^0x[a-fA-F0-9]{40}$/.test(v));
+  const solAddresses = status.verifications.filter((v) => !/^0x[a-fA-F0-9]{40}$/.test(v));
+
+  currentAddress = ethAddresses[0] || status.custody;
+  currentDisplayName = null;
+
+  els.identityPrompt.hidden = true;
+  els.siwfStatus.hidden = true;
+  els.siwfFallbackLink.hidden = true;
+  els.identityAddress.hidden = false;
+  els.identityAddress.textContent = `Signed in: ${currentAddress}`;
+  els.siwfBtn.hidden = true;
+  els.connectBtn.hidden = true;
+  els.connectDivider.hidden = true;
+
+  await loadStats(currentAddress, solAddresses);
+}
+
+async function connectWalletDirectly() {
   els.connectBtn.disabled = true;
   els.connectBtn.textContent = 'Connecting...';
 
   try {
-    const farcasterReady = sdk.actions.ready().then(() => sdk.context);
-    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
-    const context = await Promise.race([farcasterReady, timeout]);
-
-    currentAddress =
-      context?.user?.verifiedAddresses?.ethAddresses?.[0] ||
-      (window.ethereum ? (await window.ethereum.request({ method: 'eth_requestAccounts' }))[0] : null);
+    currentAddress = window.ethereum
+      ? (await window.ethereum.request({ method: 'eth_requestAccounts' }))[0]
+      : null;
 
     if (!currentAddress) {
-      throw new Error('No wallet address available - open this inside Farcaster, or connect a browser wallet.');
+      throw new Error('No wallet found - install or open MetaMask, Coinbase Wallet, or similar.');
     }
 
     els.identityPrompt.hidden = true;
     els.identityAddress.hidden = false;
-    els.identityAddress.textContent = currentAddress;
+    els.identityAddress.textContent = `Connected: ${currentAddress}`;
+    els.siwfBtn.hidden = true;
     els.connectBtn.hidden = true;
+    els.connectDivider.hidden = true;
 
-    await loadStats(currentAddress);
+    await loadStats(currentAddress, null);
   } catch (err) {
     console.error(err);
     els.identityPrompt.textContent = `Could not connect: ${err.message}`;
     els.identityPrompt.hidden = false;
     els.connectBtn.disabled = false;
-    els.connectBtn.textContent = 'Connect wallet';
+    els.connectBtn.textContent = 'Connect wallet directly';
   }
 }
 
-async function loadStats(address) {
-  const [respect, empire, identity] = await Promise.all([
+async function loadStats(address, knownSolAddresses) {
+  const [respect, empire] = await Promise.all([
     fetchJSON(`/api/respect/${address}`),
     fetchJSON(`/api/empire/${address}`),
-    fetchJSON(`/api/identity/${address}`),
   ]);
 
-  // Check every verified Solana address against WaveWarZ, not just the first -
-  // an artist's WaveWarZ wallet may not be their primary verified address.
-  let wavewarz = { found: false, note: 'no verified Solana address on this Farcaster account' };
-  if (identity.solAddresses?.length) {
+  let solAddresses = knownSolAddresses;
+  if (solAddresses === null) {
+    const identity = await fetchJSON(`/api/identity/${address}`).catch(() => ({ solAddresses: [] }));
+    solAddresses = identity.solAddresses || [];
+    currentDisplayName = identity.username || currentDisplayName;
+  }
+
+  let wavewarz = { found: false, note: 'no verified Solana address found' };
+  if (solAddresses.length) {
     const results = await Promise.all(
-      identity.solAddresses.map((solAddr) => fetchJSON(`/api/wavewarz/${solAddr}`).catch(() => ({ found: false })))
+      solAddresses.map((solAddr) => fetchJSON(`/api/wavewarz/${solAddr}`).catch(() => ({ found: false })))
     );
     wavewarz = results.find((r) => r.found) || { found: false, note: 'no WaveWarZ match across verified Solana addresses' };
   }
@@ -87,8 +196,41 @@ async function loadStats(address) {
     ? `${wavewarz.volumeSol} SOL volume`
     : (wavewarz.note || 'check WaveWarZ wallet linkage');
 
-  els.statsGrid.hidden = false;
-  els.attestSection.hidden = false;
+  document.getElementById('stats-grid').hidden = false;
+  document.getElementById('attest-section').hidden = false;
+}
+
+// Returns an EIP-1193 provider to sign with: the injected wallet if one
+// exists (MetaMask etc.), otherwise lazily brings up WalletConnect's QR /
+// deep-link flow so ANY browser can still sign a transaction.
+async function getSigningProvider() {
+  if (window.ethereum) return window.ethereum;
+
+  if (!wcProvider) {
+    els.mintStatus.textContent = 'Loading wallet connector...';
+    const { walletConnectProjectId } = await fetchJSON('/api/config');
+    if (!walletConnectProjectId) {
+      throw new Error('No wallet extension found, and WalletConnect is not configured.');
+    }
+
+    const { EthereumProvider } = await import('https://esm.sh/@walletconnect/ethereum-provider@2');
+
+    wcProvider = await EthereumProvider.init({
+      projectId: walletConnectProjectId,
+      chains: [8453],
+      showQrModal: true,
+      metadata: {
+        name: 'ZAO Artist Value Ledger',
+        description: 'Proof of your standing across The ZAO',
+        url: window.location.origin,
+        icons: [],
+      },
+    });
+  }
+
+  els.mintStatus.textContent = 'Scan the QR code or approve in your wallet app...';
+  await wcProvider.enable();
+  return wcProvider;
 }
 
 async function mintAttestation() {
@@ -111,16 +253,32 @@ async function mintAttestation() {
       }),
     });
 
+    const provider = await getSigningProvider();
     els.mintStatus.textContent = 'Confirm in your wallet...';
 
-    const walletClient = createWalletClient({
-      chain: base,
-      transport: custom(window.ethereum),
-    });
-    void walletClient;
+    const walletClient = createWalletClient({ chain: base, transport: custom(provider) });
+    const [account] = await walletClient.getAddresses();
 
-    els.mintStatus.textContent =
-      'Attestation prepared - wallet signing flow needs to be completed and tested live before this button actually mints.';
+    const txHash = await walletClient.writeContract({
+      address: prepared.easContractAddress,
+      abi: EAS_ABI,
+      functionName: 'attest',
+      account,
+      args: [{
+        schema: prepared.schemaUID,
+        data: {
+          recipient: prepared.recipient,
+          expirationTime: 0n,
+          revocable: true,
+          refUID: '0x0000000000000000000000000000000000000000000000000000000000000000',
+          data: prepared.encodedData,
+          value: 0n,
+        },
+      }],
+    });
+
+    els.mintStatus.textContent = '';
+    showProofCard(txHash, prepared.snapshotTimestamp);
   } catch (err) {
     console.error(err);
     els.mintStatus.textContent = `Could not mint: ${err.message}`;
@@ -129,11 +287,49 @@ async function mintAttestation() {
   }
 }
 
+function showProofCard(txHash, snapshotTimestamp) {
+  const s = currentStats;
+  const totalRespect = BigInt(s.respect.ogRespect || 0) + BigInt(s.respect.zorRespect || 0);
+
+  els.proofArtist.textContent = currentDisplayName ? `@${currentDisplayName}` : currentAddress;
+  els.proofRespect.textContent = totalRespect.toString();
+  els.proofEmpire.textContent = s.empire.rank ? `#${s.empire.rank}` : 'unranked';
+  els.proofWavewarz.textContent = s.wavewarz.found
+    ? `${s.wavewarz.wins} wins - ${s.wavewarz.volumeSol} SOL`
+    : 'no record';
+
+  const date = new Date(snapshotTimestamp * 1000);
+  els.proofDate.textContent = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  const explorerUrl = `https://base.easscan.org/attestation/tx/${txHash}`;
+  els.proofLink.setAttribute('href', explorerUrl);
+  els.proofUrlFallback.textContent = explorerUrl;
+  els.proofLink.dataset.url = explorerUrl;
+
+  document.getElementById('attest-section').hidden = true;
+  els.proofCard.hidden = false;
+}
+
+async function shareProof() {
+  const url = els.proofLink.dataset.url;
+  const text = `Verified my standing in The ZAO onchain - Respect, Empire Builder rank, and WaveWarZ record, all in one proof.`;
+
+  try {
+    await sdk.actions.composeCast({ text, embeds: [url] });
+  } catch (err) {
+    console.error('composeCast unavailable (not inside a Farcaster client), falling back', err);
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      els.shareBtn.textContent = 'Copied - paste into a cast';
+    } catch (clipErr) {
+      els.shareBtn.textContent = 'Copy failed - use link below';
+    }
+    setTimeout(() => { els.shareBtn.textContent = 'Share to Farcaster'; }, 3000);
+  }
+}
+
 async function fetchJSON(url, options = {}) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request to ${url} failed`);

@@ -22,8 +22,16 @@
   </header>
 
   <section class="identity-card" id="identity-card">
-    <p class="identity-prompt">Connect your Farcaster wallet to load your standing.</p>
-    <button id="connect-btn" class="btn-primary">Connect wallet</button>
+    <p class="identity-prompt">Connect to load your standing.</p>
+
+    <button id="siwf-btn" class="btn-primary">Sign in with Farcaster</button>
+    <p class="siwf-status" id="siwf-status"></p>
+    <a id="siwf-fallback-link" class="siwf-fallback-link" href="#" target="_blank" hidden>Open sign-in link manually</a>
+
+    <div class="connect-divider"><span>or</span></div>
+
+    <button id="connect-btn" class="btn-secondary">Connect wallet directly</button>
+
     <p class="identity-address" id="identity-address" hidden></p>
   </section>
 
@@ -52,11 +60,37 @@
     <p class="mint-status" id="mint-status"></p>
   </section>
 
+  <section class="proof-card" id="proof-card" hidden>
+    <div class="proof-eyebrow">THE ZAO - VERIFIED PROOF</div>
+    <div class="proof-artist" id="proof-artist">-</div>
+    <div class="proof-divider"></div>
+    <div class="proof-stat-row">
+      <span class="proof-stat-label">Respect</span>
+      <span class="proof-stat-value" id="proof-respect">-</span>
+    </div>
+    <div class="proof-stat-row">
+      <span class="proof-stat-label">Empire Builder rank</span>
+      <span class="proof-stat-value" id="proof-empire">-</span>
+    </div>
+    <div class="proof-stat-row">
+      <span class="proof-stat-label">WaveWarZ</span>
+      <span class="proof-stat-value" id="proof-wavewarz">-</span>
+    </div>
+    <div class="proof-footer">
+      <span class="proof-badge">Verified onchain - Base</span>
+      <span class="proof-date" id="proof-date">-</span>
+    </div>
+    <div class="proof-actions">
+      <button id="share-btn" class="btn-primary">Share to Farcaster</button>
+      <a id="proof-link" class="proof-raw-link" href="#" target="_blank" rel="noopener">View onchain record</a>
+      <p class="proof-url-fallback" id="proof-url-fallback"></p>
+    </div>
+  </section>
+
 </main>
 
 <script type="module" src="https://esm.sh/@farcaster/miniapp-sdk"></script>
 <script type="module" src="https://esm.sh/viem@2"></script>
-<script type="module" src="https://esm.sh/@ethereum-attestation-service/eas-sdk@2"></script>
-<script type="module" src="/app.js?v=2"></script>
+<script type="module" src="/app.js?v=7"></script>
 </body>
 </html>
