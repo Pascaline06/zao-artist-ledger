@@ -329,15 +329,27 @@ function showProofCard(txHash, snapshotTimestamp) {
 }
 
 async function shareProof() {
-  const url = els.proofLink.dataset.url;
-  const text = `Verified my standing in The ZAO onchain - Respect, Empire Builder rank, and WaveWarZ record, all in one proof.`;
+  const attestationUrl = els.proofLink.dataset.url;
+  const appUrl = window.location.origin;
+  const s = currentStats;
+  const totalRespect = BigInt(s.respect.ogRespect || 0) + BigInt(s.respect.zorRespect || 0);
+  const wavewarzLine = s.wavewarz.found
+    ? `${s.wavewarz.wins} WaveWarZ wins, ${s.wavewarz.volumeSol} SOL volume`
+    : 'no WaveWarZ record yet';
+
+  const text = `Verified my standing in The ZAO onchain:
+Respect: ${totalRespect}
+Empire Builder: ${s.empire.rank ? `#${s.empire.rank}` : 'unranked'}
+${wavewarzLine}
+
+Proof: ${attestationUrl}`;
 
   try {
-    await sdk.actions.composeCast({ text, embeds: [url] });
+    await sdk.actions.composeCast({ text, embeds: [appUrl] });
   } catch (err) {
     console.error('composeCast unavailable (not inside a Farcaster client), falling back', err);
     try {
-      await navigator.clipboard.writeText(`${text} ${url}`);
+      await navigator.clipboard.writeText(`${text} ${appUrl}`);
       els.shareBtn.textContent = 'Copied - paste into a cast';
     } catch (clipErr) {
       els.shareBtn.textContent = 'Copy failed - use link below';
