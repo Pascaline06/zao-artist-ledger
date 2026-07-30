@@ -1,37 +1,29 @@
 import { Router } from 'express';
+import { formatUnits } from 'viem';
 import { optimismClient, CONTRACTS } from '../lib/chains.js';
 
 const router = Router();
 
-// Minimal ABIs - just the read functions we need
 const ERC20_ABI = [
   {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
+    name: 'balanceOf', type: 'function', stateMutability: 'view',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'decimals', type: 'function', stateMutability: 'view',
+    inputs: [], outputs: [{ name: '', type: 'uint8' }],
   },
 ];
 
 const ERC1155_ABI = [
   {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'account', type: 'address' },
-      { name: 'id', type: 'uint256' },
-    ],
+    name: 'balanceOf', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }, { name: 'id', type: 'uint256' }],
     outputs: [{ name: '', type: 'uint256' }],
   },
 ];
 
-// GET /api/respect/:address
-// Returns OG Respect (ERC-20) balance + ZOR Respect (ERC-1155, token id 0) balance.
-// NOTE on ZOR: this reads token id 0 as a starting point. ZOR is minted per fractal
-// session, so real usage may span multiple token ids - confirm the id scheme against
-// the fractalbotmarch2026 contract before treating this as a complete picture.
 router.get('/:address', async (req, res) => {
   const { address } = req.params;
 
@@ -40,24 +32,29 @@ router.get('/:address', async (req, res) => {
   }
 
   try {
-    const [ogBalance, zorBalance] = await Promise.all([
+    const [rawOgBalance, ogDecimals, zorBalance] = await Promise.all([
       optimismClient.readContract({
-        address: CONTRACTS.ogRespect,
-        abi: ERC20_ABI,
-        functionName: 'balanceOf',
-        args: [address],
+        address: CONTRACTS.ogRespect, abi: ERC20_ABI,
+        functionName: 'balanceOf', args: [address],
       }),
       optimismClient.readContract({
-        address: CONTRACTS.zorRespect,
-        abi: ERC1155_ABI,
-        functionName: 'balanceOf',
-        args: [address, 0n],
+        address: CONTRACTS.ogRespect, abi: ERC20_ABI,
+        functionName: 'decimals',
+      }),
+      optimismClient.readContract({
+        address: CONTRACTS.zorRespect, abi: ERC1155_ABI,
+        functionName: 'balanceOf', args: [address, 0n],
       }),
     ]);
 
+    // Real bug fix: was returning the raw uint256 (e.g. 18-decimal token
+    // units) instead of a human-readable number. Read decimals() from the
+    // contract itself rather than assume 18, and format properly.
+    const ogRespectFormatted = formatUnits(rawOgBalance, ogDecimals);
+
     res.json({
       address,
-      ogRespect: ogBalance.toString(),
+      ogRespect: ogRespectFormatted,
       zorRespect: zorBalance.toString(),
       source: 'optimism-onchain-read',
       fetchedAt: new Date().toISOString(),

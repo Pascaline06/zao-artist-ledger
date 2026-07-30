@@ -180,7 +180,7 @@ async function loadStats(address, knownSolAddresses) {
 
   currentStats = { respect, empire, wavewarz };
 
-  const totalRespect = BigInt(respect.ogRespect || 0) + BigInt(respect.zorRespect || 0);
+  const totalRespect = (parseFloat(respect.ogRespect) || 0) + (parseFloat(respect.zorRespect) || 0);
   document.getElementById('stat-respect').textContent = totalRespect.toString();
   document.getElementById('stat-respect-detail').textContent =
     `OG ${respect.ogRespect} + ZOR ${respect.zorRespect}`;
@@ -307,7 +307,7 @@ async function mintAttestation() {
 
 function showProofCard(txHash, snapshotTimestamp) {
   const s = currentStats;
-  const totalRespect = BigInt(s.respect.ogRespect || 0) + BigInt(s.respect.zorRespect || 0);
+  const totalRespect = (parseFloat(s.respect.ogRespect) || 0) + (parseFloat(s.respect.zorRespect) || 0);
 
   els.proofArtist.textContent = currentDisplayName ? `@${currentDisplayName}` : currentAddress;
   els.proofRespect.textContent = totalRespect.toString();
@@ -332,10 +332,10 @@ async function shareProof() {
   const attestationUrl = els.proofLink.dataset.url;
   const appUrl = window.location.origin;
   const s = currentStats;
-  const totalRespect = BigInt(s.respect.ogRespect || 0) + BigInt(s.respect.zorRespect || 0);
+  const totalRespect = (parseFloat(s.respect.ogRespect) || 0) + (parseFloat(s.respect.zorRespect) || 0);
   const wavewarzLine = s.wavewarz.found
     ? `${s.wavewarz.wins} WaveWarZ wins, ${s.wavewarz.volumeSol} SOL volume`
-    : 'no WaveWarZ record yet';
+    : (s.wavewarz.note || 'no WaveWarZ record yet');
 
   const text = `Verified my standing in The ZAO onchain:
 Respect: ${totalRespect}
