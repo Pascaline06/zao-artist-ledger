@@ -1,4 +1,5 @@
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+sdk.actions.ready().catch(() => {});
 import { createWalletClient, custom } from 'https://esm.sh/viem@2';
 import { base } from 'https://esm.sh/viem@2/chains';
 
