@@ -12,6 +12,13 @@ sdk.actions.ready().catch(() => {});
       new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
     ]);
     const user = context?.user;
+    console.log('[debug] sdk.context:', JSON.stringify(context));
+    // TEMPORARY: show the raw context on-page so it's visible without devtools
+    const debugEl = document.createElement('pre');
+    debugEl.style.cssText = 'background:#111;color:#0f0;padding:10px;font-size:10px;white-space:pre-wrap;word-break:break-all;margin:10px 0;';
+    debugEl.textContent = 'DEBUG sdk.context:\n' + JSON.stringify(context, null, 2);
+    document.querySelector('.page').prepend(debugEl);
+
     if (user?.verifiedAddresses?.ethAddresses?.length) {
       window.__zaoAutoSignIn = {
         ethAddress: user.verifiedAddresses.ethAddresses[0],
