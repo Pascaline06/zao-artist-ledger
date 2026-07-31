@@ -1,5 +1,28 @@
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 sdk.actions.ready().catch(() => {});
+
+// If launched as a real Farcaster Mini App with a signed-in user, skip the
+// sign-in buttons entirely and load stats immediately - per Zaal's feedback,
+// asking someone to approve again inside their own already-open Mini App is
+// unnecessary friction.
+(async () => {
+  try {
+    const context = await Promise.race([
+      sdk.context,
+      new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]);
+    const user = context?.user;
+    if (user?.verifiedAddresses?.ethAddresses?.length) {
+      window.__zaoAutoSignIn = {
+        ethAddress: user.verifiedAddresses.ethAddresses[0],
+        solAddresses: user.verifiedAddresses.solAddresses || [],
+        username: user.username || null,
+      };
+    }
+  } catch (err) {
+    console.error('auto sign-in check failed', err);
+  }
+})();
 import { createWalletClient, custom } from 'https://esm.sh/viem@2';
 import { base } from 'https://esm.sh/viem@2/chains';
 
@@ -58,6 +81,22 @@ els.siwfBtn.addEventListener('click', signInWithFarcaster);
 els.connectBtn.addEventListener('click', connectWalletDirectly);
 els.mintBtn.addEventListener('click', mintAttestation);
 els.shareBtn.addEventListener('click', shareProof);
+
+// Check for an auto-detected Mini App sign-in (set above) shortly after load
+setTimeout(async () => {
+  if (window.__zaoAutoSignIn) {
+    const { ethAddress, solAddresses, username } = window.__zaoAutoSignIn;
+    currentAddress = ethAddress;
+    currentDisplayName = username;
+    els.identityPrompt.hidden = true;
+    els.identityAddress.hidden = false;
+    els.identityAddress.textContent = username ? `Signed in as @${username}` : `Signed in: ${ethAddress}`;
+    els.siwfBtn.hidden = true;
+    els.connectBtn.hidden = true;
+    els.connectDivider.hidden = true;
+    await loadStats(ethAddress, solAddresses);
+  }
+}, 1800);
 
 function clearSiwfTimers() {
   if (siwfPollTimer) clearInterval(siwfPollTimer);
@@ -190,12 +229,16 @@ async function loadStats(address, knownSolAddresses) {
     ? `${empire.balance} ZABAL`
     : 'ZABAL Empire';
 
-  document.getElementById('stat-wavewarz').textContent = wavewarz.found
-    ? `${wavewarz.wins} wins`
-    : 'no match';
-  document.getElementById('stat-wavewarz-detail').textContent = wavewarz.found
-    ? `${wavewarz.volumeSol} SOL volume`
-    : (wavewarz.note || 'check WaveWarZ wallet linkage');
+  if (wavewarz.found && wavewarz.role === 'trader') {
+    document.getElementById('stat-wavewarz').textContent = `${wavewarz.winRate}% win rate`;
+    document.getElementById('stat-wavewarz-detail').textContent = `Trader - ${wavewarz.volumeSol} SOL volume, ${wavewarz.netPnlSol} SOL P&L`;
+  } else if (wavewarz.found) {
+    document.getElementById('stat-wavewarz').textContent = `${wavewarz.wins} wins`;
+    document.getElementById('stat-wavewarz-detail').textContent = `Artist - ${wavewarz.volumeSol} SOL volume`;
+  } else {
+    document.getElementById('stat-wavewarz').textContent = 'no match';
+    document.getElementById('stat-wavewarz-detail').textContent = wavewarz.note || 'check WaveWarZ wallet linkage';
+  }
 
   document.getElementById('stats-grid').hidden = false;
   document.getElementById('attest-section').hidden = false;

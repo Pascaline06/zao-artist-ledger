@@ -2,34 +2,33 @@ import { Router } from 'express';
 
 const router = Router();
 
-// Real, documented, no-auth public API - confirmed live 2026-07-19.
-// Replaces the earlier scraper stub entirely.
 const WAVEWARZ_API = 'https://wavewarz-intelligence.vercel.app';
+const CACHE_TTL_MS = 60 * 1000;
 
-let cache = { artists: null, fetchedAt: 0 };
-const CACHE_TTL_MS = 60 * 1000; // matches their own 30-60s server cache
+let artistCache = { data: null, fetchedAt: 0 };
+let traderCache = { data: null, fetchedAt: 0 };
 
 async function getArtistLeaderboard() {
-  if (cache.artists && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache.artists;
-  }
-  const response = await fetch(`${WAVEWARZ_API}/api/public/leaderboards/artists?limit=500`, {
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) throw new Error(`WaveWarZ API responded ${response.status}`);
-  const data = await response.json();
-  cache = { artists: data.artists || [], fetchedAt: Date.now() };
-  return cache.artists;
+  if (artistCache.data && Date.now() - artistCache.fetchedAt < CACHE_TTL_MS) return artistCache.data;
+  const res = await fetch(`${WAVEWARZ_API}/api/public/leaderboards/artists?limit=500`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`WaveWarZ artists API responded ${res.status}`);
+  const data = await res.json();
+  artistCache = { data: data.artists || [], fetchedAt: Date.now() };
+  return artistCache.data;
 }
 
-// Solana addresses are base58 and CASE-SENSITIVE - never lowercase these,
-// unlike the Ethereum addresses used elsewhere in this app.
+async function getTraderLeaderboard() {
+  if (traderCache.data && Date.now() - traderCache.fetchedAt < CACHE_TTL_MS) return traderCache.data;
+  const res = await fetch(`${WAVEWARZ_API}/api/public/leaderboards/traders?limit=500`, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`WaveWarZ traders API responded ${res.status}`);
+  const data = await res.json();
+  traderCache = { data: data.traders || [], fetchedAt: Date.now() };
+  return traderCache.data;
+}
+
 function matchesWallet(entryWallet, targetAddress) {
   if (!entryWallet) return false;
   if (entryWallet === targetAddress) return true;
-  // Defensive fallback in case the API ever truncates wallets in responses
-  // (docs example shows "23oq...GmG" style - unconfirmed if that's real or
-  // just doc shorthand). Matches on the visible prefix/suffix around "...".
   if (entryWallet.includes('...')) {
     const [prefix, suffix] = entryWallet.split('...');
     return targetAddress.startsWith(prefix) && targetAddress.endsWith(suffix);
@@ -37,35 +36,56 @@ function matchesWallet(entryWallet, targetAddress) {
   return false;
 }
 
-// GET /api/wavewarz/:address - address here is the artist's SOLANA wallet,
-// not the Base/EVM address used for Respect and Empire Builder. The frontend
-// needs to supply the right one - these are different chains entirely.
+// GET /api/wavewarz/:address - checks the artist leaderboard first (battle
+// competitor), then falls back to the trader leaderboard (someone who bets
+// on battles) - these are two different roles on WaveWarZ, and someone can
+// be on one, both, or neither.
 router.get('/:address', async (req, res) => {
   const { address } = req.params;
 
   try {
     const artists = await getArtistLeaderboard();
-    const match = artists.find((a) => matchesWallet(a.wallet, address));
+    const artistMatch = artists.find((a) => matchesWallet(a.wallet, address));
 
-    if (!match) {
+    if (artistMatch) {
       return res.json({
-        address, found: false,
-        note: 'no WaveWarZ artist match for this Solana wallet',
-        source: 'wavewarz-public-api', fetchedAt: new Date().toISOString(),
+        address,
+        found: true,
+        role: 'artist',
+        name: artistMatch.name,
+        wins: artistMatch.wins,
+        losses: artistMatch.losses,
+        winRate: artistMatch.winRate,
+        volumeSol: parseFloat(artistMatch.totalVolumeSol),
+        earningsSol: parseFloat(artistMatch.totalEarningsSol),
+        source: 'wavewarz-public-api',
+        fetchedAt: new Date().toISOString(),
+      });
+    }
+
+    const traders = await getTraderLeaderboard();
+    const traderMatch = traders.find((t) => matchesWallet(t.wallet, address));
+
+    if (traderMatch) {
+      return res.json({
+        address,
+        found: true,
+        role: 'trader',
+        winRate: traderMatch.winRate,
+        wins: traderMatch.wins,
+        losses: traderMatch.losses,
+        volumeSol: traderMatch.totalVolumeSol,
+        netPnlSol: traderMatch.netPnlSol,
+        battleCount: traderMatch.battleCount,
+        source: 'wavewarz-public-api',
+        fetchedAt: new Date().toISOString(),
       });
     }
 
     res.json({
-      address,
-      found: true,
-      name: match.name,
-      wins: match.wins,
-      losses: match.losses,
-      winRate: match.winRate,
-      volumeSol: parseFloat(match.totalVolumeSol),
-      earningsSol: parseFloat(match.totalEarningsSol),
-      source: 'wavewarz-public-api',
-      fetchedAt: new Date().toISOString(),
+      address, found: false,
+      note: 'no WaveWarZ artist or trader match for this Solana wallet',
+      source: 'wavewarz-public-api', fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
     console.error('[wavewarz] fetch failed', err);
