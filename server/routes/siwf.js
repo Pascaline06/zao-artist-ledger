@@ -41,6 +41,8 @@ router.get('/status/:channelToken', async (req, res) => {
 
     if (isError) throw error;
 
+    console.log('[siwf] raw status data:', JSON.stringify(data));
+
     if (data.state !== 'completed') {
       return res.json({ state: data.state });
     }
