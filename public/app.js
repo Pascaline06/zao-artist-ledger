@@ -11,20 +11,18 @@ sdk.actions.ready().catch(() => {});
       sdk.context,
       new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
     ]);
+    // Mini App context only gives us fid/username, not verified addresses -
+    // resolve those separately via Neynar using the fid.
     const user = context?.user;
-    console.log('[debug] sdk.context:', JSON.stringify(context));
-    // TEMPORARY: show the raw context on-page so it's visible without devtools
-    const debugEl = document.createElement('pre');
-    debugEl.style.cssText = 'background:#111;color:#0f0;padding:10px;font-size:10px;white-space:pre-wrap;word-break:break-all;margin:10px 0;';
-    debugEl.textContent = 'DEBUG sdk.context:\n' + JSON.stringify(context, null, 2);
-    document.querySelector('.page').prepend(debugEl);
-
-    if (user?.verifiedAddresses?.ethAddresses?.length) {
-      window.__zaoAutoSignIn = {
-        ethAddress: user.verifiedAddresses.ethAddresses[0],
-        solAddresses: user.verifiedAddresses.solAddresses || [],
-        username: user.username || null,
-      };
+    if (user?.fid) {
+      const resolved = await fetchJSON(`/api/identity-by-fid/${user.fid}`).catch(() => null);
+      if (resolved?.ethAddress) {
+        window.__zaoAutoSignIn = {
+          ethAddress: resolved.ethAddress,
+          solAddresses: resolved.solAddresses || [],
+          username: resolved.username || user.username || null,
+        };
+      }
     }
   } catch (err) {
     console.error('auto sign-in check failed', err);

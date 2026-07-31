@@ -11,6 +11,7 @@ import easRoute from './routes/eas.js';
 import identityRoute from './routes/identity.js';
 import siwfRoute from './routes/siwf.js';
 import configRoute from './routes/config.js';
+import identityByFidRoute from './routes/identity-by-fid.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/eas', easRoute);
 app.use('/api/identity', identityRoute);
 app.use('/api/siwf', siwfRoute);
 app.use('/api/config', configRoute);
+app.use('/api/identity-by-fid', identityByFidRoute);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
