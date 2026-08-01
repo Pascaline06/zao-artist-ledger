@@ -229,10 +229,14 @@ async function loadStats(address, knownSolAddresses) {
   document.getElementById('stat-respect-detail').textContent =
     `OG ${respect.ogRespect} + ZOR ${respect.zorRespect}`;
 
-  document.getElementById('stat-empire').textContent = empire.rank ?? 'unranked';
-  document.getElementById('stat-empire-detail').textContent = empire.balance
-    ? `${empire.balance} ZABAL`
-    : 'ZABAL Empire';
+  if (empire.found && empire.rankings.length) {
+    document.getElementById('stat-empire').textContent = `#${empire.rank}`;
+    document.getElementById('stat-empire-detail').textContent =
+      empire.rankings.map((r) => `${r.label} (#${r.rank})`).join(', ');
+  } else {
+    document.getElementById('stat-empire').textContent = 'unranked';
+    document.getElementById('stat-empire-detail').textContent = 'not on any ZABAL leaderboard';
+  }
 
   if (wavewarz.found && wavewarz.role === 'trader') {
     document.getElementById('stat-wavewarz').textContent = `${wavewarz.winRate}% win rate`;
